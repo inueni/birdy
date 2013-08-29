@@ -1,6 +1,7 @@
 from requests.auth import HTTPBasicAuth
 from requests_oauthlib import OAuth1Session, OAuth2Session
 from oauthlib.oauth2 import BackendApplicationClient
+from oauthlib.common import to_unicode
 import requests
 import json
 
@@ -168,7 +169,6 @@ class TwitterClientMixin(object):
 
 class UserClient(TwitterClientMixin):
     def __init__(self, consumer_key, consumer_secret, access_token=None, access_token_secret=None,
-                 callback_url=None, oauth_verifier=None,
                  api_version=TWITTER_API_VERSION, base_api_url=TWITTER_BASE_API_URL):
         
         self.api_version = api_version
@@ -183,8 +183,6 @@ class UserClient(TwitterClientMixin):
         self.consumer_secret = consumer_secret
         self.access_token = access_token
         self.access_token_secret = access_token_secret
-        self.callback_url = callback_url
-        self.oauth_verifier = oauth_verifier
         
         self.session = self.get_oauth_session()
         
@@ -194,17 +192,18 @@ class UserClient(TwitterClientMixin):
         return OAuth1Session(client_key=self.consumer_key,
                              client_secret=self.consumer_secret,
                              resource_owner_key=self.access_token,
-                             resource_owner_secret=self.access_token_secret,
-                             callback_uri=self.callback_url,
-                             verifier=self.oauth_verifier)
+                             resource_owner_secret=self.access_token_secret)
     
-    def get_signin_token(self, **kwargs):
-        return self.get_request_token(self.base_signin_url, **kwargs)
+    def get_signin_token(self, callback_url=None, auto_set_token=True, **kwargs):
+        return self.get_request_token(self.base_signin_url, callback_url, auto_set_token, **kwargs)
     
-    def get_authorize_token(self, **kwargs):
-        return self.get_request_token(self.base_authorize_url, **kwargs)
+    def get_authorize_token(self, callback_url=None, auto_set_token=True, **kwargs):
+        return self.get_request_token(self.base_authorize_url, callback_url, auto_set_token, **kwargs)
     
-    def get_request_token(self, base_auth_url=None, **kwargs):
+    def get_request_token(self, base_auth_url=None, callback_url=None, auto_set_token=True, **kwargs):
+        if callback_url:
+            self.session._client.client.callback_uri = to_unicode(callback_url, 'utf-8')
+            
         try:
             token = self.session.fetch_request_token(self.request_token_url)
         except requests.RequestException as e:
@@ -215,14 +214,18 @@ class UserClient(TwitterClientMixin):
         if base_auth_url:
             token['auth_url'] = self.session.authorization_url(base_auth_url, **kwargs)
         
+        if auto_set_token:
+            self.auto_set_token(token)
+        
         return TwitterObject(token)
     
-    def get_access_token(self, auto_set_token=True):
-        required = (self.access_token, self.access_token_secret, self.oauth_verifier)
+    def get_access_token(self, oauth_verifier, auto_set_token=True):
+        required = (self.access_token, self.access_token_secret)
         
         if not all(required):
-            raise TwitterClientError('%s must be initialized with access_token, \
-                                     access_token_secret and oauth_verified to fetch authorized access token.')
+            raise TwitterClientError('%s must be initialized with access_token and access_token_secret to fetch authorized access token.')
+        
+        self.session._client.client.verifier = to_unicode(oauth_verifier, 'utf-8')
         
         try:
             token = self.session.fetch_access_token(self.access_token_url)
@@ -232,17 +235,14 @@ class UserClient(TwitterClientMixin):
             raise TwitterClientError('Reponse does not contain a token.')
         
         if auto_set_token:
-            self.access_token = token['oauth_token']
-            self.access_token_secret = token['oauth_token_secret']
-            self.session = self.get_oauth_session()
+            self.auto_set_token(token)
         
         return TwitterObject(token)
     
-    def get_oauth_verifier_from_url(self, url):
-        try:
-            return self.session.parse_authorization_response(url)['oauth_verifier']    
-        except (ValueError, KeyError):
-            raise TwitterClientError('Response does not contain an OAuth verifier.')
+    def auto_set_token(self, token):
+        self.access_token = token['oauth_token']
+        self.access_token_secret = token['oauth_token_secret']
+        self.session = self.get_oauth_session()
     
     
 class AppClient(TwitterClientMixin):
