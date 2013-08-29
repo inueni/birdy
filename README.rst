@@ -41,7 +41,7 @@ Why another Python Twitter API client? Aren't there enough?
 
 The concept behind ``birdy`` is so simple and awesome that it just had to be done, and the result is a super light weight and easy to use API client, that covers the whole Twitter REST API in just a little over 300 lines of code.
 
-To achieve this, ``birdy`` relies on established, battle tested python libraries like ``requests`` and ``requests-ouath`` to do the heavy lifting, but more importantly it relies on Python's dynamic nature to automatically construct API calls (no individual wrapper functions for API resources needed). This allows ``birdy`` to cover all existing Twitter API resources and any future additions, without the need to update ``birdy`` itself.
+To achieve this, ``birdy`` relies on established, battle tested python libraries like ``requests`` and ``requests-ouathlib`` to do the heavy lifting, but more importantly it relies on Python's dynamic nature to automatically construct API calls (no individual wrapper functions for API resources needed). This allows ``birdy`` to cover all existing Twitter API resources and any future additions, without the need to update ``birdy`` itself.
 
 Includes full support for both **OAuth1** (user) and **OAuth2** (application) authentication workflows.
 
@@ -108,9 +108,9 @@ Actually any call can be written in this alternative syntax, use whichever you p
 Great, what about authorization? How do I get my access tokens?
 --------------------------------------------------------
 
-Before you get started, you will need to `register <https://dev.twitter.com/apps>`_ your application with Twitter, to obtain your application's ``CONSUMER_KEY`` and ``CONSUMER_SECRET``.
-
 ``birdy`` supports both **OAuth1** and **OAuth2** authentication workflows by providing two different clients, a ``UserClient`` and ``AppClient`` respectively. While requests to API resources, like in above examples are the same in both clients, the workflow for obtaining access tokens is slightly different.
+
+    Before you get started, you will need to `register <https://dev.twitter.com/apps>`_ your application with Twitter, to obtain your application's ``CONSUMER_KEY`` and ``CONSUMER_SECRET``.
 
 OAuth1 workflow for user authenticated requests (UserClient)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -225,3 +225,5 @@ That's it, you can start using the client immediately to make API request on beh
 .. code-block:: python
 
     client = AppClient(CONSUMER_KEY, CONSUMER_SECRET, SAVED_ACCESS_KEY)
+
+Keep in mind that OAuth2 authenticated requests are **read-only** and not all API resources are avaliable. Check `Twitter docs <https://dev.twitter.com/docs/api/1.1>`_ for more information.
