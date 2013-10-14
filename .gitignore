@@ -2,3 +2,5 @@
 .komodotools
 birdy.komodoproject
 *.pyc
+/*.egg-info
+/dist/

@@ -224,6 +224,6 @@ That's it, you can start using the client immediately to make API request on beh
 
 .. code-block:: python
 
-    client = AppClient(CONSUMER_KEY, CONSUMER_SECRET, SAVED_ACCESS_KEY)
+    client = AppClient(CONSUMER_KEY, CONSUMER_SECRET, SAVED_ACCESS_TOKEN)
 
 Keep in mind that OAuth2 authenticated requests are **read-only** and not all API resources are avaliable. Check `Twitter docs <https://dev.twitter.com/docs/api/1.1>`_ for more information.

@@ -8,6 +8,7 @@ import json
 TWITTER_API_VERSION = '1.1'
 TWITTER_BASE_API_URL = 'https://api.twitter.com'
 
+
 class TwitterClientError(Exception):
     pass
 
