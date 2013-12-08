@@ -1,10 +1,20 @@
 birdy
 =====
 
-``birdy`` is a super awesome Twitter API client for Python.
+``birdy`` is a super awesome Twitter API client for Python in just a little over 400 LOC.
 
 TL;DR
 -----
+
+Features
+^^^^^^^^
+
+* Full REST and Streaming API coverage (version 1.1)
+* OAuth1 (user) and OAuth2 (app) authentication
+* Automatic JSON decoding
+
+Usage
+^^^^^
 
 Import client and initialize it:
 
@@ -29,11 +39,20 @@ POST example (**POST statuses/update**):
 
     response = client.api.statuses.update.post(status='Hello @pybirdy!')
 
-Dynamic URL example (**POST statuses/destroy/:id**)
+Dynamic URL example (**POST statuses/destroy/:id**):
 
 .. code-block:: python
 
     response = client.api.statuses.destroy['240854986559455234'].post()
+
+Streaming API example (** Public Stream POST statuses/filter**): 
+
+.. code-block:: python
+
+    response = client.stream.statuses.filter.post(track='twitter')
+
+    for data in response.stream():
+        print data
 
 
 Why another Python Twitter API client? Aren't there enough?
@@ -106,7 +125,7 @@ Actually any call can be written in this alternative syntax, use whichever you p
 
 
 Great, what about authorization? How do I get my access tokens?
---------------------------------------------------------
+---------------------------------------------------------------
 
 ``birdy`` supports both **OAuth1** and **OAuth2** authentication workflows by providing two different clients, a ``UserClient`` and ``AppClient`` respectively. While requests to API resources, like in above examples are the same in both clients, the workflow for obtaining access tokens is slightly different.
 
@@ -227,3 +246,44 @@ That's it, you can start using the client immediately to make API request on beh
     client = AppClient(CONSUMER_KEY, CONSUMER_SECRET, SAVED_ACCESS_TOKEN)
 
 Keep in mind that OAuth2 authenticated requests are **read-only** and not all API resources are avaliable. Check `Twitter docs <https://dev.twitter.com/docs/api/1.1>`_ for more information.
+
+
+Is Streaming API supported as well?
+-----------------------------------
+
+Sure, since version 0.2, ``birdy`` comes with full support for Streaming API out of the box. Access to the Streaming API is provided by a special ``StreamClient``.
+
+To work with the Streaming API, first import the client and initialize it.
+
+.. code-block:: python
+
+    from birdy.twitter import StreamClient
+    client = StreamClient(CONSUMER_KEY,
+                        CONSUMER_SECRET,
+                        ACCESS_TOKEN,
+                        ACCESS_TOKEN_SECRET)
+
+To access endpoints on the **Public** stream, like **POST statuses/filter** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/post/statuses/filter>`_)
+
+.. code-block:: python
+
+    resource = client.stream.statuses.filter.post(track='twitter')
+
+For **User** stream endpoint **GET user** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/get/user>`_)
+
+.. code-block:: python
+
+    resource = client.userstream.user.get()
+
+And for **Site** stream endpoint **GET site** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/get/site>`_)
+
+.. code-block:: python
+
+    resource = client.sitestream.site.get()
+
+To access the data in the stream you iterate over ``resource.stream()`` like this
+
+.. code-block:: python
+
+    for data in resource.stream():
+       print data
