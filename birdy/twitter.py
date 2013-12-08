@@ -6,14 +6,18 @@ import requests
 import json
 
 TWITTER_API_VERSION = '1.1'
-TWITTER_BASE_API_URL = 'https://api.twitter.com'
+TWITTER_BASE_API_URL = 'https://%s.twitter.com'
 
 
-class TwitterClientError(Exception):
+class BirdyException(Exception):
     pass
 
 
-class TwitterApiError(Exception):
+class TwitterClientError(BirdyException):
+    pass
+
+
+class TwitterApiError(BirdyException):
     def __init__(self, msg, error_code=None, status_code=None, headers=None):
         self.error_code = error_code
         self.status_code = status_code
@@ -62,10 +66,27 @@ class ApiComponent(object):
 class ApiResponse(object):
     def __init__(self, resource_url, status_code, data, headers):
         self.resource_url = resource_url
+        self.status_code = status_code
         self.data = data
         self.headers = headers
-        self.status_code = status_code
 
+
+class StreamResponse(object):
+    def __init__(self, resource_url, status_code, stream_iter, json_object_hook):
+        self.resource_url = resource_url
+        self.status_code = status_code
+        self.stream_iter = stream_iter
+        self.json_object_hook = json_object_hook
+            
+    def stream(self):
+        for item in self.stream_iter():
+            if item:
+                try:
+                    data = json.loads(item, object_hook=self.json_object_hook)
+                except:
+                    pass
+                else:
+                    yield data
 
 class TwitterObject(dict):
     def __getattr__(self, name):
@@ -81,10 +102,13 @@ class TwitterObject(dict):
         return '<%s: %s>' % (self.__class__.__name__, dict.__repr__(self))
 
 
-class TwitterClientMixin(object):
+class BaseTwitterClient(object):
+    def __getattr__(self, path):
+        return ApiComponent(self, path)
+    
     def request(self, method, path, **params):
         method = method.upper()
-        url = '%s/%s/%s.json' % (self.base_api_url, self.api_version, path)
+        url = self.construct_resource_url(path)
         request_kwargs = {}
         params, files = self.sanitize_params(params)
         
@@ -95,10 +119,20 @@ class TwitterClientMixin(object):
             request_kwargs['files'] = files
         
         try:
-            response = self.session.request(method, url, **request_kwargs)
+            response = self.make_api_call(method, url, **request_kwargs)
         except requests.RequestException as e:
             raise TwitterClientError(str(e))
         
+        return self.handle_response(response)
+    
+    def construct_resource_url(self, path):
+        paths = path.split('/')
+        return '%s/%s/%s.json' % (self.base_api_url % paths[0], self.api_version, '/'.join(paths[1:]))
+    
+    def make_api_call(self, method, url, **request_kwargs):
+        return self.session.request(method, url, **request_kwargs)
+    
+    def handle_response(self, response):
         try:
             data = response.json(object_hook=self.get_json_object_hook)
         except ValueError:
@@ -168,7 +202,7 @@ class TwitterClientMixin(object):
         return (code, msg)
 
 
-class UserClient(TwitterClientMixin):
+class UserClient(BaseTwitterClient):
     def __init__(self, consumer_key, consumer_secret, access_token=None, access_token_secret=None,
                  api_version=TWITTER_API_VERSION, base_api_url=TWITTER_BASE_API_URL):
         
@@ -186,8 +220,6 @@ class UserClient(TwitterClientMixin):
         self.access_token_secret = access_token_secret
         
         self.session = self.get_oauth_session()
-        
-        self.api = ApiComponent(self)
     
     def get_oauth_session(self, ):
         return OAuth1Session(client_key=self.consumer_key,
@@ -246,7 +278,7 @@ class UserClient(TwitterClientMixin):
         self.session = self.get_oauth_session()
     
     
-class AppClient(TwitterClientMixin):
+class AppClient(BaseTwitterClient):
     def __init__(self, consumer_key, consumer_secret, access_token=None, token_type='bearer',
                  api_version=TWITTER_API_VERSION, base_api_url=TWITTER_BASE_API_URL):
         
@@ -263,7 +295,6 @@ class AppClient(TwitterClientMixin):
         
         self.session = self.get_oauth_session()
         self.auth = HTTPBasicAuth(self.consumer_key, self.consumer_secret)
-        self.api = ApiComponent(self)
     
     def get_oauth_session(self):
         client = BackendApplicationClient(self.consumer_key)
@@ -307,3 +338,33 @@ class AppClient(TwitterClientMixin):
                 return access_token
         
         raise TwitterClientError('Could not invalidate access token.')
+    
+    
+class StreamClient(BaseTwitterClient):
+    def __init__(self, consumer_key, consumer_secret, access_token=None, access_token_secret=None,
+                 api_version=TWITTER_API_VERSION, base_api_url=TWITTER_BASE_API_URL):
+        
+        self.api_version = api_version
+        self.base_api_url = base_api_url
+        
+        self.consumer_key = consumer_key
+        self.consumer_secret = consumer_secret
+        self.access_token = access_token
+        self.access_token_secret = access_token_secret
+        
+        self.session = self.get_oauth_session()
+    
+    def get_oauth_session(self, ):
+        return OAuth1Session(client_key=self.consumer_key,
+                             client_secret=self.consumer_secret,
+                             resource_owner_key=self.access_token,
+                             resource_owner_secret=self.access_token_secret)
+    
+    def make_api_call(self, method, url, **request_kwargs):
+        return self.session.request(method, url, stream=True, **request_kwargs)
+    
+    def handle_response(self, response):
+        return StreamResponse(resource_url=response.url,
+                              status_code=response.status_code,
+                              stream_iter=response.iter_lines,
+                              json_object_hook=self.get_json_object_hook)
