@@ -123,7 +123,7 @@ class BaseTwitterClient(object):
         except requests.RequestException as e:
             raise TwitterClientError(str(e))
         
-        return self.handle_response(response)
+        return self.handle_response(method, response)
     
     def construct_resource_url(self, path):
         paths = path.split('/')
@@ -132,7 +132,7 @@ class BaseTwitterClient(object):
     def make_api_call(self, method, url, **request_kwargs):
         return self.session.request(method, url, **request_kwargs)
     
-    def handle_response(self, response):
+    def handle_response(self, method, response):
         try:
             data = response.json(object_hook=self.get_json_object_hook)
         except ValueError:
@@ -363,7 +363,7 @@ class StreamClient(BaseTwitterClient):
     def make_api_call(self, method, url, **request_kwargs):
         return self.session.request(method, url, stream=True, **request_kwargs)
     
-    def handle_response(self, response):
+    def handle_response(self, method, response):
         return StreamResponse(resource_url=response.url,
                               status_code=response.status_code,
                               stream_iter=response.iter_lines,
