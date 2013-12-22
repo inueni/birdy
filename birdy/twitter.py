@@ -262,7 +262,7 @@ class UserClient(BaseTwitterClient):
         
         try:
             token = self.session.fetch_access_token(self.access_token_url)
-        except request.RequestException as e:
+        except requests.RequestException as e:
             raise TwitterClientError(str(e))
         except ValueError:
             raise TwitterClientError('Reponse does not contain a token.')
