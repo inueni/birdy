@@ -1,7 +1,7 @@
 birdy
 =====
 
-``birdy`` is a super awesome Twitter API client for Python in just a little over 400 LOC.
+``birdy`` is a super awesome Twitter API client for Python in just a little under 400 LOC.
 
 TL;DR
 -----
@@ -9,9 +9,12 @@ TL;DR
 Features
 ^^^^^^^^
 
-* Full REST and Streaming API coverage (version 1.1)
-* OAuth1 (user) and OAuth2 (app) authentication
-* Automatic JSON decoding
+* `Future proof dynamic API with full REST and Streaming API coverage <#api-label>`_
+* OAuth1 (user) and OAuth2 (app) authentication workflows
+* Automatic JSON decoding, TwitterObject
+* ApiResponse, StreamResponse objects
+* Easily extendable trough subclassing
+* Built on top of the excellent requests and requests-ouathlib libraries
 
 Usage
 ^^^^^
@@ -45,7 +48,7 @@ Dynamic URL example (**POST statuses/destroy/:id**):
 
     response = client.api.statuses.destroy['240854986559455234'].post()
 
-Streaming API example (** Public Stream POST statuses/filter**): 
+Streaming API example (**Public Stream POST statuses/filter**): 
 
 .. code-block:: python
 
@@ -66,6 +69,8 @@ Includes full support for both **OAuth1** (user) and **OAuth2** (application) au
 
 Finally, ``birdy`` is simple and explicit by design, besides error handling and JSON decoding it doesn't process the returned data in any way, that is left for you to handle (who'd know better what to do with it).
 
+
+.. _api-label:
 
 OK, I'm sold, but how do I use it? How does this dynamic API construction work?
 -------------------------------------------------------------------------------
