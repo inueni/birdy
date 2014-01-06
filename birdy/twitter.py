@@ -12,19 +12,34 @@ TWITTER_BASE_API_URL = 'https://%s.twitter.com'
 
 
 class BirdyException(Exception):
-    pass
-
+    def __init__(self, msg, resource_url=None, request_method=None, status_code=None, error_code=None, headers=None):
+        self._msg = msg
+        self.request_method = request_method
+        self.resource_url = resource_url
+        self.status_code= status_code
+        self.error_code = None
+        self.headers = None
+        
+    def __str__(self):
+        if self.request_method and self.resource_url:
+            return '%s (%s %s)' % (self._msg, self.request_method, self.resource_url)
+        return self._msg
+        
 
 class TwitterClientError(BirdyException):
     pass
-
+    
 
 class TwitterApiError(BirdyException):
-    def __init__(self, msg, error_code=None, status_code=None, headers=None):
-        self.error_code = error_code
-        self.status_code = status_code
-        self.headers = headers
-        super(TwitterApiError, self).__init__(msg)
+    def __init__(self, msg, response=None, request_method=None, error_code=None):
+        kwargs = {'request_method': request_method}
+        
+        if response is not None:
+            kwargs.update({'status_code': response.status_code,
+                           'resource_url': response.url,
+                           'headers': response.headers})
+        
+        super(TwitterApiError, self).__init__(msg, **kwargs)
         
 
 class TwitterRateLimitError(TwitterApiError):
@@ -53,29 +68,37 @@ class ApiComponent(object):
     
     def get(self, **params):
         if self._path is None:
-            raise TwitterClientError('Calling get() on an empty API path is not supported.')
+            raise TypeError('Calling get() on an empty API path is not supported.')
         return self._client.request('GET', self._path, **params)
         
     def post(self, **params):
         if self._path is None:
-            raise TwitterClientError('Calling post() on an empty API path is not supported.')
+            raise TypeError('Calling post() on an empty API path is not supported.')
         return self._client.request('POST', self._path, **params)
 
     def get_path(self):
         return self._path
-    
 
-class ApiResponse(object):
-    def __init__(self, response, json_data):
+
+class BaseResponse(object):
+    def __repr__(self):
+        return '<%s: %s %s>' % (self.__class__.__name__, self.request_method, self.resource_url)
+
+
+class ApiResponse(BaseResponse):
+    def __init__(self, response, request_method, json_data):
         self.resource_url = response.url
-        self.data = json_data
         self.headers = response.headers
+        self.request_method = request_method
+        self.data = json_data
 
 
-class StreamResponse(object):
-    def __init__(self, response, json_object_hook):
+class StreamResponse(BaseResponse):
+    def __init__(self, response, request_method, json_object_hook):
         self.resource_url = response.url
-        self._stream_iter = response.stream_iter
+        self.headers = response.headers
+        self.request_method = request_method
+        self._stream_iter = response.iter_lines
         self._json_object_hook = json_object_hook
             
     def stream(self):
@@ -89,7 +112,7 @@ class StreamResponse(object):
                     yield data
 
 
-class TwitterObject(dict):
+class JSONObject(dict):
     def __getattr__(self, name):
         if name in self.iterkeys():
             return self[name]
@@ -112,9 +135,7 @@ class BaseTwitterClient(object):
         return ApiComponent(self, path)
     
     def configure_oauth_session(self, session):
-        session.headers = {
-            'User-Agent': self.get_user_agent_string()
-        }
+        session.headers = {'User-Agent': self.get_user_agent_string()}
         return session
     
     def get_user_agent_string(self):
@@ -134,8 +155,8 @@ class BaseTwitterClient(object):
         
         try:
             response = self.make_api_call(method, url, **request_kwargs)
-        except requests.RequestException as e:
-            raise TwitterClientError(str(e))
+        except requests.RequestException as e:  
+            raise TwitterClientError(str(e), url, method)
         
         return self.handle_response(method, response)
     
@@ -146,33 +167,30 @@ class BaseTwitterClient(object):
     def make_api_call(self, method, url, **request_kwargs):
         return self.session.request(method, url, **request_kwargs)
     
-    def handle_response(self, method, response):
-        endpoint = '%s %s' % (method, response.url)
-        
+    def handle_response(self, method, response):    
         try:
             data = response.json(object_hook=self.get_json_object_hook)
         except ValueError:
             data = None
         
         if response.status_code == 200:
-            return ApiResponse(response=response, json_data=data)    
+            return ApiResponse(response, method, data)    
         
         if data is None:
-            raise TwitterApiError('Unable to decode JSON response at %s.' % endpoint, response.status_code, response.status_code)
+            raise TwitterApiError('Unable to decode JSON response.', response, method)
         
         error_code, error_msg = self.get_twitter_error_details(data)
-        error_msg = '%s at %s.' % (error_msg, endpoint)
         
         if response.status_code == 401 or 'Bad Authentication data' in error_msg:
-            raise TwitterAuthError(error_msg, error_code, response.status_code)
+            raise TwitterAuthError(error_msg, response, method, error_code)
         
         elif response.status_code == 404:
-            raise TwitterApiError('Invalid API resource at %s.' % endpoint, error_code, response.status_code)
+            raise TwitterApiError('Invalid API resource.', response, method, error_code)
         
         elif response.status_code == 429:
-            raise TwitterRateLimitError(error_msg, error_code, response.status_code, response.headers)
+            raise TwitterRateLimitError(error_msg, response, method, error_code)
         
-        raise TwitterApiError(error_msg, error_code, response.status_code)
+        raise TwitterApiError(error_msg, response, method, error_code)
         
     @staticmethod
     def sanitize_params(input_params):
@@ -194,7 +212,7 @@ class BaseTwitterClient(object):
     
     @staticmethod
     def get_json_object_hook(data):
-        return TwitterObject(data)
+        return JSONObject(data)
     
     @staticmethod
     def get_twitter_error_details(data):
@@ -213,23 +231,23 @@ class BaseTwitterClient(object):
 
 class UserClient(BaseTwitterClient):
     def __init__(self, consumer_key, consumer_secret, access_token=None, access_token_secret=None):
-        self.request_token_url = '%s/oauth/request_token' % self.base_api_url
-        self.access_token_url = '%s/oauth/access_token' % self.base_api_url
-        self.base_signin_url = '%s/oauth/authenticate' % self.base_api_url
-        self.base_authorize_url = '%s/oauth/authorize' % self.base_api_url
+        self.request_token_url = '%s/oauth/request_token' % self.base_api_url % 'api'
+        self.access_token_url = '%s/oauth/access_token' % self.base_api_url % 'api'
+        self.base_signin_url = '%s/oauth/authenticate' % self.base_api_url % 'api'
+        self.base_authorize_url = '%s/oauth/authorize' % self.base_api_url % 'api'
         
         self.consumer_key = consumer_key
         self.consumer_secret = consumer_secret
         self.access_token = access_token
         self.access_token_secret = access_token_secret
         
-        self.session = self.configure_oauth_session(self.get_oauth_session())
+        self.session = self.get_oauth_session()
     
     def get_oauth_session(self):
-        return OAuth1Session(client_key=self.consumer_key,
-                             client_secret=self.consumer_secret,
-                             resource_owner_key=self.access_token,
-                             resource_owner_secret=self.access_token_secret)
+        return self.configure_oauth_session(OAuth1Session(client_key=self.consumer_key,
+                                                          client_secret=self.consumer_secret,
+                                                          resource_owner_key=self.access_token,
+                                                          resource_owner_secret=self.access_token_secret))
     
     def get_signin_token(self, callback_url=None, auto_set_token=True, **kwargs):
         return self.get_request_token(self.base_signin_url, callback_url, auto_set_token, **kwargs)
@@ -254,13 +272,14 @@ class UserClient(BaseTwitterClient):
         if auto_set_token:
             self.auto_set_token(token)
         
-        return TwitterObject(token)
+        return JSONObject(token)
     
     def get_access_token(self, oauth_verifier, auto_set_token=True):
         required = (self.access_token, self.access_token_secret)
         
         if not all(required):
-            raise TwitterClientError('%s must be initialized with access_token and access_token_secret to fetch authorized access token.')
+            raise TwitterClientError('''%s must be initialized with access_token and access_token_secret
+                                     to fetch authorized access token.''' % self.__class__.__name__)
         
         self.session._client.client.verifier = to_unicode(oauth_verifier, 'utf-8')
         
@@ -274,7 +293,7 @@ class UserClient(BaseTwitterClient):
         if auto_set_token:
             self.auto_set_token(token)
         
-        return TwitterObject(token)
+        return JSONObject(token)
     
     def auto_set_token(self, token):
         self.access_token = token['oauth_token']
@@ -284,15 +303,15 @@ class UserClient(BaseTwitterClient):
     
 class AppClient(BaseTwitterClient):
     def __init__(self, consumer_key, consumer_secret, access_token=None, token_type='bearer'):
-        self.request_token_url = '%s/oauth2/token' % self.base_api_url
-        self.invalidate_token_url = '%s/oauth2/invalidate_token' % self.base_api_url
+        self.request_token_url = '%s/oauth2/token' % self.base_api_url % 'api'
+        self.invalidate_token_url = '%s/oauth2/invalidate_token' % self.base_api_url % 'api'
         
         self.consumer_key = consumer_key
         self.consumer_secret = consumer_secret
         self.access_token = access_token
         self.token_type = token_type
         
-        self.session = self.configure_oauth_session(self.get_oauth_session())
+        self.session = self.get_oauth_session()
         self.auth = HTTPBasicAuth(self.consumer_key, self.consumer_secret)
     
     def get_oauth_session(self):
@@ -302,7 +321,7 @@ class AppClient(BaseTwitterClient):
         if self.access_token:
             token = {'access_token': self.access_token, 'token_type': self.token_type }
         
-        return OAuth2Session(client=client, token=token)
+        return self.configure_oauth_session(OAuth2Session(client=client, token=token))
     
     def get_access_token(self, auto_set_token=True):
         data = {'grant_type': 'client_credentials'}
@@ -346,30 +365,28 @@ class StreamClient(BaseTwitterClient):
         self.access_token = access_token
         self.access_token_secret = access_token_secret
         
-        self.session = self.configure_oauth_session(self.get_oauth_session())
+        self.session = self.get_oauth_session()
     
     def get_oauth_session(self):
-        return OAuth1Session(client_key=self.consumer_key,
+        return self.configure_oauth_session(OAuth1Session(client_key=self.consumer_key,
                              client_secret=self.consumer_secret,
                              resource_owner_key=self.access_token,
-                             resource_owner_secret=self.access_token_secret)
+                             resource_owner_secret=self.access_token_secret))
     
     def make_api_call(self, method, url, **request_kwargs):
         return self.session.request(method, url, stream=True, **request_kwargs)
     
     def handle_response(self, method, response):
-        endpoint = '%s %s' % (method, response.url)
-        
         if response.status_code == 200:
-            return StreamResponse(response=response, json_object_hook=self.get_json_object_hook)
+            return StreamResponse(response, method, self.get_json_object_hook)
         
         elif response.status_code == 401:
-            raise TwitterAuthError('Unauthorized at %s.' % endpoint, response.status_code, response.status_code)
+            raise TwitterAuthError('Unauthorized.', response, method, response.status_code)
         
         elif response.status_code == 404:
-            raise TwitterApiError('Invalid API resource at %s.' % endpoint, response.status_code, response.status_code)
+            raise TwitterApiError('Invalid API resource.', response, method, response.status_code)
         
         elif response.status_code == 420:
-            raise TwitterRateLimitError('%s at %s.' % (response.content, endpoint), response.status_code, response.status_code)
+            raise TwitterRateLimitError(response.content, response, method, response.status_code)
         
-        raise TwitterApiError('%s at %s.' % (response.content, endpoint), response.status_code, response.status_code)
+        raise TwitterApiError(response.content, response, method, response.status_code)

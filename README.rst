@@ -9,12 +9,13 @@ TL;DR
 Features
 ^^^^^^^^
 
-* `Future proof dynamic API with full REST and Streaming API coverage <#api-label>`_
-* OAuth1 (user) and OAuth2 (app) authentication workflows
-* Automatic JSON decoding, TwitterObject
-* ApiResponse, StreamResponse objects
-* Easily extendable trough subclassing
-* Built on top of the excellent requests and requests-ouathlib libraries
+* `Future proof dynamic API with full REST and Streaming API coverage <#ok-im-sold-but-how-do-i-use-it-how-does-this-dynamic-api-construction-work>`_
+* `OAuth1 (user) and OAuth2 (app) authentication workflows <#great-what-about-authorization-how-do-i-get-my-access-tokens>`_
+* `Automatic JSON decoding <#automatic-json-decoding>`_, `JSONObject <#jsonobject>`_
+* `ApiResponse <#apiresponse>`_, `StreamResponse objects <#streamresponse>`_
+* `Informative exceptions <#informative-exceptions>`_ 
+* `Easily customizable trough subclassing <#customize-and-extend-trough-subclassing>`_
+* `Built on top of the excellent requests and requests-ouathlib libraries <#credits>`_
 
 Usage
 ^^^^^
@@ -61,7 +62,7 @@ Streaming API example (**Public Stream POST statuses/filter**):
 Why another Python Twitter API client? Aren't there enough?
 -----------------------------------------------------------
 
-The concept behind ``birdy`` is so simple and awesome that it just had to be done, and the result is a super light weight and easy to use API client, that covers the whole Twitter REST API in just a little over 300 lines of code.
+The concept behind ``birdy`` is so simple and awesome that it just had to be done, and the result is a super light weight and easy to use API client, that covers the whole Twitter REST API in just a little under 400 lines of code.
 
 To achieve this, ``birdy`` relies on established, battle tested python libraries like ``requests`` and ``requests-ouathlib`` to do the heavy lifting, but more importantly it relies on Python's dynamic nature to automatically construct API calls (no individual wrapper functions for API resources needed). This allows ``birdy`` to cover all existing Twitter API resources and any future additions, without the need to update ``birdy`` itself.
 
@@ -128,6 +129,48 @@ Actually any call can be written in this alternative syntax, use whichever you p
 
     response = client.api['statuses/destroy']['240854986559455234'].post()
 
+
+Is Streaming API supported as well?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sure, since version 0.2, ``birdy`` comes with full support for Streaming API out of the box. Access to the Streaming API is provided by a special ``StreamClient``.
+
+    ``StreamClient`` can't be used to obtain access tokens, but you can use ``UserClient`` to get them.
+
+To work with the Streaming API, first import the client and initialize it.
+
+.. code-block:: python
+
+    from birdy.twitter import StreamClient
+    client = StreamClient(CONSUMER_KEY,
+                        CONSUMER_SECRET,
+                        ACCESS_TOKEN,
+                        ACCESS_TOKEN_SECRET)
+
+To access resources on the **Public** stream, like **POST statuses/filter** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/post/statuses/filter>`_)
+
+.. code-block:: python
+
+    resource = client.stream.statuses.filter.post(track='twitter')
+
+For **User** stream resource **GET user** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/get/user>`_)
+
+.. code-block:: python
+
+    resource = client.userstream.user.get()
+
+And for **Site** stream resource **GET site** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/get/site>`_)
+
+.. code-block:: python
+
+    resource = client.sitestream.site.get()
+
+To access the data in the stream you iterate over ``resource.stream()`` like this
+
+.. code-block:: python
+
+    for data in resource.stream():
+       print data
 
 Great, what about authorization? How do I get my access tokens?
 ---------------------------------------------------------------
@@ -250,45 +293,146 @@ That's it, you can start using the client immediately to make API request on beh
 
     client = AppClient(CONSUMER_KEY, CONSUMER_SECRET, SAVED_ACCESS_TOKEN)
 
-Keep in mind that OAuth2 authenticated requests are **read-only** and not all API resources are avaliable. Check `Twitter docs <https://dev.twitter.com/docs/api/1.1>`_ for more information.
+Keep in mind that OAuth2 authenticated requests are **read-only** and not all API resources are available. Check `Twitter docs <https://dev.twitter.com/docs/api/1.1>`_ for more information.
 
+Any other useful features I should know about?
+----------------------------------------------
 
-Is Streaming API supported as well?
------------------------------------
+Of course, ``birdy`` comes with some handy features, to ease your development, right out of the box. Lets take a look at some of the goodies.
 
-Sure, since version 0.2, ``birdy`` comes with full support for Streaming API out of the box. Access to the Streaming API is provided by a special ``StreamClient``.
+Automatic JSON decoding
+^^^^^^^^^^^^^^^^^^^^^^^
 
-To work with the Streaming API, first import the client and initialize it.
+JSON data returned by the REST and Streaming API is automatically decoded to native Python objects, no extra coding necessary, start using the data right away.
+
+JSONObject
+^^^^^^^^^^
+ 
+When decoding JSON data, ``objects`` are, instead of a regular Python dictionary, converted to a ``JSONObject``, which is a read-only dictionary subclass with attribute style access in addition to regular dictionary lookup style, for convenience. The following code produces the same result
+
+.. code-block:: python
+ 
+    followers_count = response.data['followers_count']
+
+    followers_count = response.data.followers_count
+
+..
+
+    Don't want to use JSONObject? No problem, this behavior can be changed by means of subclassing.
+    
+ApiResponse
+^^^^^^^^^^^
+
+Calls to REST API resources return a ``ApiResponse``, which in addition to returned data, also gives you access to response headers (useful for checking rate limits) and resource URL.
 
 .. code-block:: python
 
-    from birdy.twitter import StreamClient
-    client = StreamClient(CONSUMER_KEY,
-                        CONSUMER_SECRET,
-                        ACCESS_TOKEN,
-                        ACCESS_TOKEN_SECRET)
+    response.data           # decoded JSON data
+    response.resource_url   # resource URL
+    response.headers        # dictionary containing response HTTP headers
+   
+StreamResponse
+^^^^^^^^^^^^^^
 
-To access endpoints on the **Public** stream, like **POST statuses/filter** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/post/statuses/filter>`_)
-
-.. code-block:: python
-
-    resource = client.stream.statuses.filter.post(track='twitter')
-
-For **User** stream endpoint **GET user** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/get/user>`_)
+``StreamResponse`` is returned when calling Streaming API resources and provides the **stream()** method which returns an iterator used to receive JSON decoded streaming data. Like ``ApiResponse`` it also gives you access to response headers and resource URL.
 
 .. code-block:: python
 
-    resource = client.userstream.user.get()
+    response.stream()       # a generator method used to iterate over the stream
+    
+    for data in response.stream():
+        print data 
 
-And for **Site** stream endpoint **GET site** (`Twitter docs <https://dev.twitter.com/docs/api/1.1/get/site>`_)
+Informative exceptions
+^^^^^^^^^^^^^^^^^^^^^^
+
+There are 4 types of exceptions in ``birdy`` all subclasses of base ``BirdyException`` (which is never directly raised). 
+
+* ``TwitterClientError`` raised for connection and access token retrieval errors 
+* ``TwitterApiError`` raised when Twitter returns an error
+* ``TwitterAuthError`` raised when authentication fails, ``TwitterApiError`` subclass
+* ``TwitterRateLimitError`` raised when rate limit for resource is reached, ``TwitterApiError`` subclass
+
+``TwitterApiError`` and ``TwitterClientError`` instances (exepct for access token retrieval errors) provide a informative error description which includes the resource URL and request method used (very handy when tracking errors in logs), also available is the following:
 
 .. code-block:: python
 
-    resource = client.sitestream.site.get()
+    exception.request_method    # HTTP method used to make the request (GET or POST)
+    exception.resource_url      # URL of the API resource called
+    exception.status_code       # HTTP status code returned by Twitter
+    exception.error_code        # error code returned by Twitter
+    exception.headers           # dictionary containing response HTTP headers
 
-To access the data in the stream you iterate over ``resource.stream()`` like this
+Customize and extend trough subclassing
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``birdy`` was built with subclassing in mind, if you wish to change the way it works, all you have to do is subclass one of the clients and override some methods and you are good to go.
+
+    Subclassing a client and then using the subclass instance in your code is actually **the recommended way** of using ``birdy``.
+
+For example, if you don't wish to use ``JSONObject`` you have to override **get_json_object_hook()** method.
 
 .. code-block:: python
 
-    for data in resource.stream():
-       print data
+    from birdy.twitter import UserClient
+    
+    class MyClient(UserClient)
+        @staticmethod
+        def get_json_object_hook(data):
+            return data
+    
+    client = MyClient(...)
+    response = client.api.users.show.get(screen_name='twitter')
+
+Or maybe, if you want global error handling for common errors, just override **handle_response()** method.
+
+.. code-block:: python
+
+   class MyClient(UserClient)
+       def handle_response(self, method, response):
+           try:
+               response = super(MyClient, self).handle_response(method, response)
+           except TwitterApiError, e:
+               ...
+               # Your error handling code
+               ...
+           return response
+
+Another use of subclassing is configuration of ``requests.Session`` instance (`docs <http://docs.python-requests.org/en/latest/api/#sessionapi>`_) used to make HTTP requests, to configure it, you override the **configure_oauth_session()** method.
+
+.. code-block:: python
+
+    class MyClient(UserClient)
+        def configure_oauth_session(self, session):
+            session = super(MyClient, self).configure_oauth_session(session)
+            session.proxies = {'http': 'foo.bar:3128'}
+        return session
+
+Do you accept contributions and feature requests?
+-------------------------------------------------
+
+**Yes**, both contributions (including feedback) and feature requests are welcome, the proper way in both cases is to first open an issue on `GitHub <https://github.com/inueni/birdy/issues>`_ and we will take if from there.
+
+    Keep in mind that I work on this project on my free time, so I might not be able to respond right way.
+
+What does the future hold? Will there be a 1.0 release?
+-------------------------------------------------------
+
+Next release (0.3) will focus on Python 3 support, the version after that should be 1.0 which will focus on unit tests. 
+
+After 1.0 some of the possible features are:
+
+* Cursors for REST API
+* Automatic reconnecting for Streaming API
+
+Credits
+-------
+
+``birdy`` would not exists if not for the excellent `requests <http://www.python-requests.org>`_ and `requests-oauthlib <https://requests-oauthlib.readthedocs.org/en/latest/>`_ libraries and the wonderful `Python <http://www.python.org>`_ programing language.
+
+Also thanks to `Twython <https://github.com/ryanmcgrath/twython>`_ for inspiration and `python-twitter <https://github.com/bear/python-twitter>`_ for motivation.
+
+Question, comments, ...
+-----------------------
+
+If you need to contact me, you can follow me on Twitter (`@sect2k <https://twitter.com/sect2k/>`_) or drop me an email at `mitja@inueni.com <mailto:mitja@inueni.com>`_.
