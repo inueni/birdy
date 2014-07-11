@@ -17,8 +17,8 @@ class BirdyException(Exception):
         self.request_method = request_method
         self.resource_url = resource_url
         self.status_code= status_code
-        self.error_code = None
-        self.headers = None
+        self.error_code = error_code
+        self.headers = headers
         
     def __str__(self):
         if self.request_method and self.resource_url:
