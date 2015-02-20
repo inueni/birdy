@@ -28,19 +28,25 @@ class BirdyException(Exception):
 
 class TwitterClientError(BirdyException):
     pass
-    
+
 
 class TwitterApiError(BirdyException):
     def __init__(self, msg, response=None, request_method=None, error_code=None):
-        kwargs = {'request_method': request_method}
-        
+        kwargs = {}
         if response is not None:
-            kwargs.update({'status_code': response.status_code,
-                           'resource_url': response.url,
-                           'headers': response.headers})
-        
-        super(TwitterApiError, self).__init__(msg, **kwargs)
-        
+            kwargs = {
+                'status_code': response.status_code,
+                'resource_url': response.url,
+                'headers': response.headers,
+            }
+
+        super(TwitterApiError, self).__init__(
+            msg,
+            request_method=request_method,
+            error_code=error_code,
+            **kwargs
+        )
+
 
 class TwitterRateLimitError(TwitterApiError):
     pass
@@ -146,52 +152,65 @@ class BaseTwitterClient(object):
         url = self.construct_resource_url(path)
         request_kwargs = {}
         params, files = self.sanitize_params(params)
-        
+
         if method == 'GET':
             request_kwargs['params'] = params
         elif method == 'POST':
             request_kwargs['data'] = params
             request_kwargs['files'] = files
-        
+
         try:
             response = self.make_api_call(method, url, **request_kwargs)
-        except requests.RequestException as e:  
-            raise TwitterClientError(str(e), url, method)
-        
+        except requests.RequestException as e:
+            raise TwitterClientError(
+                str(e),
+                resource_url=url,
+                request_method=method
+            )
+
         return self.handle_response(method, response)
-    
+
     def construct_resource_url(self, path):
         paths = path.split('/')
         return '%s/%s/%s.json' % (self.base_api_url % paths[0], self.api_version, '/'.join(paths[1:]))
-    
+
     def make_api_call(self, method, url, **request_kwargs):
         return self.session.request(method, url, **request_kwargs)
-    
-    def handle_response(self, method, response):    
+
+    def handle_response(self, method, response):
         try:
             data = response.json(object_hook=self.get_json_object_hook)
         except ValueError:
             data = None
-        
+
         if response.status_code == 200:
-            return ApiResponse(response, method, data)    
-        
+            return ApiResponse(response, method, data)
+
         if data is None:
-            raise TwitterApiError('Unable to decode JSON response.', response, method)
-        
+            raise TwitterApiError(
+                'Unable to decode JSON response.',
+                response=response,
+                request_method=method,
+            )
+
         error_code, error_msg = self.get_twitter_error_details(data)
-        
+        kwargs = {
+            'response': response,
+            'request_method': method,
+            'error_code': error_code,
+        }
+
         if response.status_code == 401 or 'Bad Authentication data' in error_msg:
-            raise TwitterAuthError(error_msg, response, method, error_code)
-        
-        elif response.status_code == 404:
-            raise TwitterApiError('Invalid API resource.', response, method, error_code)
-        
-        elif response.status_code == 429:
-            raise TwitterRateLimitError(error_msg, response, method, error_code)
-        
-        raise TwitterApiError(error_msg, response, method, error_code)
-        
+            raise TwitterAuthError(error_msg, **kwargs)
+
+        if response.status_code == 404:
+            raise TwitterApiError('Invalid API resource.', **kwargs)
+
+        if response.status_code == 429:
+            raise TwitterRateLimitError(error_msg, **kwargs)
+
+        raise TwitterApiError(error_msg, **kwargs)
+
     @staticmethod
     def sanitize_params(input_params):
         params, files = ({}, {})
@@ -375,18 +394,24 @@ class StreamClient(BaseTwitterClient):
     
     def make_api_call(self, method, url, **request_kwargs):
         return self.session.request(method, url, stream=True, **request_kwargs)
-    
+
     def handle_response(self, method, response):
+
         if response.status_code == 200:
             return StreamResponse(response, method, self.get_json_object_hook)
-        
-        elif response.status_code == 401:
-            raise TwitterAuthError('Unauthorized.', response, method, response.status_code)
-        
-        elif response.status_code == 404:
-            raise TwitterApiError('Invalid API resource.', response, method, response.status_code)
-        
-        elif response.status_code == 420:
-            raise TwitterRateLimitError(response.content, response, method, response.status_code)
-        
-        raise TwitterApiError(response.content, response, method, response.status_code)
+
+        kwargs = {
+            'request_method': method,
+            'response': response,
+        }
+
+        if response.status_code == 401:
+            raise TwitterAuthError('Unauthorized.', **kwargs)
+
+        if response.status_code == 404:
+            raise TwitterApiError('Invalid API resource.', **kwargs)
+
+        if response.status_code == 420:
+            raise TwitterRateLimitError(response.content, **kwargs)
+
+        raise TwitterApiError(response.content, **kwargs)
