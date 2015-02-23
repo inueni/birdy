@@ -114,7 +114,7 @@ class StreamResponse(BaseResponse):
 
 class JSONObject(dict):
     def __getattr__(self, name):
-        if name in self.iterkeys():
+        if name in self:
             return self[name]
         raise AttributeError('%s has no property named %s.' % (self.__class__.__name__, name))
     
