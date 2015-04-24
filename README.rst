@@ -14,7 +14,7 @@ Features
 * `Automatic JSON decoding <#automatic-json-decoding>`_, `JSONObject <#jsonobject>`_
 * `ApiResponse <#apiresponse>`_, `StreamResponse objects <#streamresponse>`_
 * `Informative exceptions <#informative-exceptions>`_ 
-* `Easily customizable trough subclassing <#customize-and-extend-trough-subclassing>`_
+* `Easily customizable through subclassing <#customize-and-extend-through-subclassing>`_
 * `Built on top of the excellent requests and requests-ouathlib libraries <#credits>`_
 
 Usage
@@ -363,7 +363,7 @@ There are 4 types of exceptions in ``birdy`` all subclasses of base ``BirdyExcep
     exception.error_code        # error code returned by Twitter
     exception.headers           # dictionary containing response HTTP headers
 
-Customize and extend trough subclassing
+Customize and extend through subclassing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``birdy`` was built with subclassing in mind, if you wish to change the way it works, all you have to do is subclass one of the clients and override some methods and you are good to go.
