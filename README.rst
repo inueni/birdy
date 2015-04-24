@@ -376,7 +376,7 @@ For example, if you don't wish to use ``JSONObject`` you have to override **get_
 
     from birdy.twitter import UserClient
     
-    class MyClient(UserClient)
+    class MyClient(UserClient):
         @staticmethod
         def get_json_object_hook(data):
             return data
@@ -388,7 +388,7 @@ Or maybe, if you want global error handling for common errors, just override **h
 
 .. code-block:: python
 
-   class MyClient(UserClient)
+   class MyClient(UserClient):
        def handle_response(self, method, response):
            try:
                response = super(MyClient, self).handle_response(method, response)
@@ -402,7 +402,7 @@ Another use of subclassing is configuration of ``requests.Session`` instance (`d
 
 .. code-block:: python
 
-    class MyClient(UserClient)
+    class MyClient(UserClient):
         def configure_oauth_session(self, session):
             session = super(MyClient, self).configure_oauth_session(session)
             session.proxies = {'http': 'foo.bar:3128'}
