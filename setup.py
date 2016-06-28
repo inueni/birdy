@@ -8,7 +8,7 @@ try:
     import pypandoc
     description = pypandoc.convert('README.md', 'rst')
 except (IOError, ImportError):
-    description = ''
+    description = open('README.rst').read()
 
 setup(
     name = 'birdy',
