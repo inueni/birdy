@@ -4,6 +4,12 @@ from birdy import __author__, __version__
 import os
 import sys
 
+try:
+    import pypandoc
+    description = pypandoc.convert('README.md', 'rst')
+except (IOError, ImportError):
+    description = open('README.rst').read()
+
 setup(
     name = 'birdy',
     version = __version__,
@@ -17,7 +23,7 @@ setup(
     url = 'https://github.com/inueni/birdy/',
     keywords = 'twitter api tweet birdy search',
     description = 'birdy is a super awesome Twitter API client for Python.',
-    long_description = open('README.rst').read(),
+    long_description = description,
     include_package_data = True,
     packages = (
         'birdy',
