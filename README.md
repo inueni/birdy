@@ -15,6 +15,15 @@
   - [Easily customizable through subclassing](#customize-and-extend-through-subclassing)
   - [Built on top of the excellent requests and requests-ouathlib libraries](#credits)
 
+
+### Installation
+
+The easiest and recommended way to install `birdy` is from [PyPI](https://pypi.python.org/pypi/birdy)
+
+```
+pip install birdy
+```
+
 ### Usage
 
 Import client and initialize it:
