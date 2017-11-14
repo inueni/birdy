@@ -126,13 +126,6 @@ class JSONObject(dict):
         if name in self:
             return self[name]
         raise AttributeError('%s has no property named %s.' % (self.__class__.__name__, name))
-    
-    def __setattr__(self, *args):
-        raise AttributeError('%s instances are read-only.' % self.__class__.__name__)
-    __delattr__ = __setitem__ = __delitem__ = __setattr__
-    
-    def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, dict.__repr__(self))
 
 
 class BaseTwitterClient(object):
@@ -190,18 +183,10 @@ class BaseTwitterClient(object):
             return ApiResponse(response, method, data)
 
         if response.status_code == 429:
-            raise TwitterRateLimitError(
-                'Too many requests',
-                response=response,
-                request_method=method,
-                error_code=429)
+            raise TwitterRateLimitError('Too many requests', response=response, request_method=method, error_code=429)
 
         if data is None:
-            raise TwitterApiError(
-                'Unable to decode JSON response.',
-                response=response,
-                request_method=method,
-            )
+            raise TwitterApiError('Unable to decode JSON response.', response=response, request_method=method)
 
         error_code, error_msg = self.get_twitter_error_details(data)
         kwargs = {
@@ -222,7 +207,7 @@ class BaseTwitterClient(object):
     def sanitize_params(input_params):
         params, files = ({}, {})
         
-        for k, v in input_params.items():
+        for k, v in list(input_params.items()):
             if hasattr(v, 'read') and callable(v.read):
                 files[k] = v
             elif isinstance(v, bool):
