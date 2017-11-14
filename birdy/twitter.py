@@ -186,6 +186,13 @@ class BaseTwitterClient(object):
         if response.status_code == 200:
             return ApiResponse(response, method, data)
 
+        if response.status_code == 429:
+            raise TwitterRateLimitError(
+                'Too many requests',
+                response=response,
+                request_method=method,
+                error_code=429)
+
         if data is None:
             raise TwitterApiError(
                 'Unable to decode JSON response.',
@@ -205,9 +212,6 @@ class BaseTwitterClient(object):
 
         if response.status_code == 404:
             raise TwitterApiError('Invalid API resource.', **kwargs)
-
-        if response.status_code == 429:
-            raise TwitterRateLimitError(error_msg, **kwargs)
 
         raise TwitterApiError(error_msg, **kwargs)
 
