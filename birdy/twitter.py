@@ -32,18 +32,21 @@ class TwitterClientError(BirdyException):
 
 class TwitterApiError(BirdyException):
     def __init__(self, msg, response=None, request_method=None, error_code=None):
-        kwargs = {}
+        kwargs = {
+            'request_method': request_method,
+            'error_code': error_code,
+        }
         if response is not None:
-            kwargs = {
-                'status_code': response.status_code,
-                'resource_url': response.url,
-                'headers': response.headers,
-            }
+            kwargs.update(
+                {
+                    'status_code': response.status_code,
+                    'resource_url': response.url,
+                    'headers': response.headers,
+                }
+            )
 
         super(TwitterApiError, self).__init__(
             msg,
-            request_method=request_method,
-            error_code=error_code,
             **kwargs
         )
 
