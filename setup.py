@@ -42,7 +42,7 @@ setup(
     include_package_data = True,
     packages = find_packages(),
     zip_safe=False,
-    classifiers=(
+    classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Web Environment',
         'Intended Audience :: Developers',
@@ -58,5 +58,5 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
-    )
+    ]
 )
