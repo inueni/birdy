@@ -3,6 +3,7 @@ from setuptools import setup, find_packages
 from birdy import __author__, __version__
 import os
 import sys
+from io import open
 
 try:
     from pypandoc import convert
