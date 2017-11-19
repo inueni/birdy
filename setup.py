@@ -1,9 +1,12 @@
 #!/usr/bin/env python
-from setuptools import setup, find_packages
-from birdy import __author__, __version__
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals, print_function
+
 import os
 import sys
 from io import open
+from setuptools import setup, find_packages
+from birdy import __author__, __version__
 
 try:
     from pypandoc import convert
