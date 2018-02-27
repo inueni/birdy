@@ -33,8 +33,8 @@ setup(
     name = 'birdy',
     version = __version__,
     install_requires = (
-        'requests>=1.2.3',
-        'requests_oauthlib>=0.3.2',
+        'requests>=2.4.2',
+        'requests_oauthlib>=0.4.2',
     ),
     author = 'Mitja Pagon',
     author_email = 'mitja@inueni.com',

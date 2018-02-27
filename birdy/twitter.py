@@ -75,15 +75,15 @@ class ApiComponent(object):
     def __getattr__(self, path):
         return self[path]
     
-    def get(self, **params):
+    def get(self, *args, **params):
         if self._path is None:
             raise TypeError('Calling get() on an empty API path is not supported.')
-        return self._client.request('GET', self._path, **params)
+        return self._client.request('GET', self._path, *args, **params)
         
-    def post(self, **params):
+    def post(self, *args, **params):
         if self._path is None:
             raise TypeError('Calling post() on an empty API path is not supported.')
-        return self._client.request('POST', self._path, **params)
+        return self._client.request('POST', self._path, *args, **params)
 
     def get_path(self):
         return self._path
@@ -143,7 +143,7 @@ class BaseTwitterClient(object):
     def get_user_agent_string(self):
         return self.user_agent_string
     
-    def request(self, method, path, **params):
+    def request(self, method, path, *args, **params):
         method = method.upper()
         url = self.construct_resource_url(path)
         request_kwargs = {}
@@ -152,9 +152,17 @@ class BaseTwitterClient(object):
         if method == 'GET':
             request_kwargs['params'] = params
         elif method == 'POST':
-            request_kwargs['data'] = params
-            request_kwargs['files'] = files
-
+            try:
+                json_params = args[0]
+            except IndexError:
+                json_params = None
+            
+            if isinstance(json_params, dict):
+                request_kwargs['json'] = json.dumps(json_params)
+            else:
+                request_kwargs['data'] = params
+                request_kwargs['files'] = files
+        
         try:
             response = self.make_api_call(method, url, **request_kwargs)
         except requests.RequestException as e:
@@ -202,7 +210,7 @@ class BaseTwitterClient(object):
             raise TwitterApiError('Invalid API resource.', **kwargs)
 
         raise TwitterApiError(error_msg, **kwargs)
-
+    
     @staticmethod
     def sanitize_params(input_params):
         params, files = ({}, {})
