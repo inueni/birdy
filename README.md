@@ -13,7 +13,7 @@
   - [ApiResponse](#apiresponse), [StreamResponse](#streamresponse) objects
   - [Informative exceptions](#informative-exceptions)
   - [Easily customizable through subclassing](#customize-and-extend-through-subclassing)
-  - [Built on top of the excellent requests and requests-ouathlib libraries](#credits)
+  - [Built on top of the excellent requests and requests-oauthlib libraries](#credits)
 
 
 ### Installation
@@ -73,7 +73,7 @@ for data in response.stream():
 The concept behind `birdy` is so simple and awesome that it just had to be done, and the result is a super light weight and easy to use API
 client, that covers the whole Twitter REST API in just a little under 400 lines of code.
 
-To achieve this, `birdy` relies on established, battle tested python libraries like `requests` and `requests-ouathlib` to do the heavy
+To achieve this, `birdy` relies on established, battle tested python libraries like `requests` and `requests-oauthlib` to do the heavy
 lifting, but more importantly it relies on Python's dynamic nature to automatically construct API calls (no individual wrapper functions for API resources needed). This allows `birdy` to cover all existing Twitter API resources and any future additions, without the need to update `birdy` itself.
 
 Includes full support for both **OAuth1** (user) and **OAuth2** (application) authentication workflows.
@@ -347,7 +347,7 @@ There are 4 types of exceptions in `birdy` all subclasses of base `BirdyExceptio
     `TwitterApiError` subclass
   - `TwitterRateLimitError` raised when rate limit for resource is reached, `TwitterApiError` subclass
 
-`TwitterApiError` and `TwitterClientError` instances (exepct for access token retrieval errors) provide a informative error description which includes the resource URL and request method used (very handy when tracking errors in logs), also available is the following:
+`TwitterApiError` and `TwitterClientError` instances (except for access token retrieval errors) provide a informative error description which includes the resource URL and request method used (very handy when tracking errors in logs), also available is the following:
 
 ```python
 exception.request_method    # HTTP method used to make the request (GET or POST)
